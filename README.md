@@ -21,9 +21,11 @@ npm run preview:applymate
 
 Open `http://localhost:4174`, use a test email, request a code, and select **Open local email preview**. Start with synthetic resume data.
 
-See [ApplyMate setup, workflow, limitations, and hosting gates](applymate/README.md). Its frontend builds to static files, but the complete application also requires its API and persistent storage. **The Azure template and deployment workflow below deploy BroCalc only.** They do not publish ApplyMate.
+The owner-restricted Azure pilot is hosted at [ApplyMate Microsoft sign-in](https://applymate-personal.purplesand-17d722b5.eastus.azurecontainerapps.io/.auth/login/aad?post_login_redirect_uri=/). It serves the frontend and backend together with private persistent storage. Microsoft sign-in is restricted to the pilot owner; Google sign-in is not implemented.
 
-The separate **Publish ApplyMate frontend preview** workflow publishes a GitHub Pages landing preview from `main`. This public build makes no API requests and accepts no personal data; account and document workflows remain available locally.
+See [ApplyMate setup, workflow, limitations, and hosting instructions](applymate/README.md). **The BroCalc Azure template and deployment workflow below remain separate.**
+
+The separate **Publish ApplyMate frontend preview** workflow publishes a GitHub Pages landing preview from `main`. This public build makes no API requests and accepts no personal data; it is not the Azure application.
 
 ## BroCalc
 

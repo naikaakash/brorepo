@@ -4,10 +4,12 @@ import { fileURLToPath } from "node:url";
 import { createApp } from "./app.js";
 import { loadCipher } from "./crypto.js";
 import { AppError, requireCondition } from "./errors.js";
+import { acquireCloudLease } from "./cloud-lease.js";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
+const cloud = process.env.APPLYMATE_CLOUD === "azure";
 const dataRoot = resolve(root, process.env.APPLYMATE_DATA_DIR ?? ".applymate/local");
-const port = Number(process.env.APPLYMATE_PORT ?? 7072);
+const port = Number(process.env.PORT ?? process.env.APPLYMATE_PORT ?? 7072);
 const origin = process.env.APPLYMATE_ORIGIN ?? "http://localhost:4174";
 const origins = [...new Set([origin, "http://localhost:5174", "http://127.0.0.1:5174", "http://localhost:4174", "http://127.0.0.1:4174"])];
 
@@ -35,21 +37,30 @@ async function acquireLock(): Promise<() => Promise<void>> {
 }
 
 async function main() {
-  requireCondition(process.env.NODE_ENV !== "production", 500, "LOCAL_ONLY", "Public production deployment is not enabled. Run the local build without NODE_ENV=production.");
-  requireCondition(!process.env.APPLYMATE_HOST || process.env.APPLYMATE_HOST === "127.0.0.1", 500, "LOCAL_ONLY", "ApplyMate only binds to 127.0.0.1 in this milestone.");
+  requireCondition(cloud ? Boolean((process.env.WEBSITE_SITE_NAME || process.env.CONTAINER_APP_NAME) && process.env.APPLYMATE_TENANT && process.env.APPLYMATE_OWNER &&
+    process.env.APPLYMATE_DATA_KEY && process.env.APPLYMATE_DATA_DIR?.startsWith("/home/") && origin.startsWith("https://")) :
+    process.env.NODE_ENV !== "production", 500, "HOST_CONFIG", "Public hosting requires Azure App Service identity, an owner restriction, an encryption key, HTTPS, and persistent /home storage.");
+  requireCondition(cloud || !process.env.APPLYMATE_HOST || process.env.APPLYMATE_HOST === "127.0.0.1", 500, "LOCAL_ONLY", "The local mode only binds to 127.0.0.1.");
   requireCondition(Number.isInteger(port) && port >= 1024 && port <= 65535, 500, "PORT_CONFIG", "Set APPLYMATE_PORT to a valid unprivileged port.");
   requireCondition(!process.env.APPLYMATE_SMTP_URL || process.env.APPLYMATE_SMTP_FROM, 500, "SMTP_CONFIG", "Set APPLYMATE_SMTP_FROM when enabling SMTP.");
-  const release = await acquireLock();
+  const release = cloud ? await acquireCloudLease(() => {
+    console.error("[ApplyMate] Storage lease lost; stopping immediately to prevent concurrent database access.");
+    process.exit(1);
+  }) : await acquireLock();
   let runtime: Awaited<ReturnType<typeof createApp>>;
   try {
     const cipher = await loadCipher(dataRoot, process.env.APPLYMATE_DATA_KEY);
     runtime = await createApp({
-      directory: join(dataRoot, "postgres"), cipher, origin, origins,
-      smtpUrl: process.env.APPLYMATE_SMTP_URL, smtpFrom: process.env.APPLYMATE_SMTP_FROM
+      directory: join(dataRoot, "postgres"), cipher, origin, origins: cloud ? [origin] : origins,
+      smtpUrl: cloud ? undefined : process.env.APPLYMATE_SMTP_URL, smtpFrom: cloud ? undefined : process.env.APPLYMATE_SMTP_FROM,
+      ...(cloud ? {
+        cloud: { tenant: process.env.APPLYMATE_TENANT!, objectId: process.env.APPLYMATE_OWNER! },
+        frontend: join(root, "applymate", "client", "dist")
+      } : {})
     });
   } catch (error) { await release(); throw error; }
-  const server = runtime.app.listen(port, "127.0.0.1", () => {
-    console.log(`ApplyMate API ready at http://127.0.0.1:${port} (local-only; no request logging).`);
+  const server = runtime.app.listen(port, cloud ? "0.0.0.0" : "127.0.0.1", () => {
+    console.log(`ApplyMate ready on port ${port} (${cloud ? "owner-restricted Azure pilot" : "local-only"}; no request logging).`);
   });
   server.requestTimeout = 25000;
   server.headersTimeout = 10000;

@@ -37,4 +37,7 @@ jobs:
         run: npm run check:applymate
 
       - name: Validate infrastructure template
-        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+        run: |
+          az bicep build --file infra/main.bicep --stdout > /dev/null
+          az bicep build --file infra/applymate-pilot.bicep --stdout > /dev/null
+          az bicep build --file infra/applymate-runtime.bicep --stdout > /dev/null

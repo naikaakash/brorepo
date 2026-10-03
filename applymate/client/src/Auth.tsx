@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, FileText, Fingerprint, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
 import { policyVersion, z } from "@applymate/contracts";
-import { api, successSchema } from "./api";
+import { api, savedSchema, successSchema } from "./api";
 import { Badge, Brand, Button, Field, Notice } from "./ui";
 import { useAction } from "./hooks";
 
 const letterSchema = z.object({ code: z.string().regex(/^\d{6}$/), expiresAt: z.string(), notice: z.string() });
 const signInSchema = z.object({ user: z.object({ id: z.string(), email: z.email() }), token: z.string() });
 
-export function Auth({ mailMode, signedIn, publicPreview = false }: { mailMode: "local" | "smtp"; signedIn: () => Promise<void>; publicPreview?: boolean }) {
+export function Auth({ mailMode, signedIn, publicPreview = false }: { mailMode: "local" | "smtp" | "microsoft"; signedIn: () => Promise<void>; publicPreview?: boolean }) {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [consent, setConsent] = useState(false);
@@ -24,7 +24,7 @@ export function Auth({ mailMode, signedIn, publicPreview = false }: { mailMode: 
     previouslySent.current = sent;
   }, [sent]);
   return <div className="landing">
-    <header className="landing-nav"><a href="#welcome" aria-label="ApplyMate home"><Brand /></a><Badge><span className="status-dot" /> {publicPreview ? "Public frontend preview" : "Local preview"}</Badge></header>
+    <header className="landing-nav"><a href="#welcome" aria-label="ApplyMate home"><Brand /></a><Badge><span className="status-dot" /> {publicPreview ? "Public frontend preview" : mailMode === "microsoft" ? "Private online pilot" : "Local preview"}</Badge></header>
     <main className="landing-main">
       <section className="landing-story">
         <p className="eyebrow"><Sparkles size={16} aria-hidden="true" /> YOUR NEXT CHAPTER STARTS WITH YOU</p>
@@ -49,6 +49,17 @@ export function Auth({ mailMode, signedIn, publicPreview = false }: { mailMode: 
           <p>The integrated local workflow includes confirmed candidate facts, writing-voice onboarding, job evidence mapping, reviewed PDF and Word exports, and manual application tracking.</p>
           <a className="button primary full" href="https://github.com/naikaakash/brorepo/tree/main">View source &amp; local setup <ArrowRight size={18} aria-hidden="true" /></a>
           <p>No account or personal information is collected by this preview. Public account features require a production backend and delivered-email verification.</p>
+        </div> : mailMode === "microsoft" ? <div>
+          <Notice>Your Microsoft account is authenticated by Azure. This pilot is restricted to its owner. Profile data and files are saved in private Azure storage, not on this computer.</Notice>
+          <label className="check-row"><input type="checkbox" checked={consent} disabled={action.busy} onChange={(event) => setConsent(event.target.checked)} /><span>I consent to storing my profile and files in this private online pilot until I delete them. No model calls or employer submissions happen without my explicit action.</span></label>
+          {action.feedback}
+          <Button className="primary full" disabled={!consent} loading={action.busy} onClick={() => {
+            void action.run(async () => {
+              await api.request("/cloud-account", savedSchema, { method: "POST", body: { consent: true, policyVersion } });
+              await signedIn();
+            });
+          }}>Open my online workspace <ArrowRight size={18} aria-hidden="true" /></Button>
+          <a href="/.auth/logout?post_logout_redirect_uri=/">Use another Microsoft account</a>
         </div> : <><form onSubmit={(event) => {
           event.preventDefault();
           void action.run(async () => {

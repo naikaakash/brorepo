@@ -167,7 +167,7 @@ export const connectionInputSchema = connectionSchema.pick({ provider: true, mod
 }).strict();
 export const activitySchema = metaSchema.extend({ action: text(120), objectId: text(100), detail: text(500) });
 export const capabilitySchema = z.object({
-  localOnly: z.boolean(), mailMode: z.enum(["local", "smtp"]), engine: text(200),
+  localOnly: z.boolean(), mailMode: z.enum(["local", "smtp", "microsoft"]), engine: text(200),
   automation: z.literal(false), managedInbox: z.literal(false), billing: z.literal(false),
   limits: z.object({ documents: z.number(), jobs: z.number(), dailyPackages: z.number() })
 });

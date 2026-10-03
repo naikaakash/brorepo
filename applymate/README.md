@@ -1,6 +1,6 @@
 # ApplyMate
 
-A local, resume-first application workspace built with React/TypeScript, an Express API, Better Auth, and embedded PostgreSQL through PGlite. This is the first integrated intelligence milestone, not a finished commercial auto-apply service.
+A resume-first application workspace built with React/TypeScript, an Express API, and embedded PostgreSQL through PGlite. Local mode uses Better Auth; the owner-restricted Azure pilot uses platform Microsoft authentication. This is the first integrated intelligence milestone, not a finished commercial auto-apply service.
 
 ## Run locally
 
@@ -96,7 +96,7 @@ Set environment variables in the process that starts the API; its entrypoint doe
 | `APPLYMATE_SMTP_URL` | Optional SMTP transport URL; may contain credentials |
 | `APPLYMATE_SMTP_FROM` | Required sender address when SMTP is enabled |
 
-The development proxy uses 7072. Prefer the defaults; changing the API port also requires adjusting the development proxy. The API intentionally rejects production mode and non-loopback hosting/origins. Do not disable those guards or tunnel this server to publish it.
+The development proxy uses 7072. Prefer the defaults; changing the API port also requires adjusting the development proxy. Local mode intentionally rejects production mode and non-loopback hosting/origins. Do not disable those guards or tunnel the local server to publish it. Azure mode requires explicit platform identity, owner restrictions, HTTPS, managed keys, and persistent storage.
 
 SMTP mode sends real verification email and disables the local inbox preview. Configure an account and sender you control; no mail provider or domain is provisioned automatically.
 
@@ -135,8 +135,18 @@ The local build remains fully interactive. Public sign-in and saved-data feature
 
 `npm run build:applymate` produces a static frontend in `applymate\client\dist`. Public static hosting can serve those files, but the current client also expects a same-origin `/api`. Uploading only the frontend does not provide authentication, persistence, queues, or document generation.
 
-For an Azure release, a possible architecture is Static Web Apps for the frontend, a separately hosted Node API/worker, managed PostgreSQL, protected document storage, a managed secret store, and a real email provider. [Microsoft's API integration documentation](https://learn.microsoft.com/en-us/azure/static-web-apps/apis-overview) distinguishes built-in Functions from bring-your-own backends; linking an existing App Service or Container Apps API requires Static Web Apps Standard. The existing Express/PGlite runtime is not a drop-in stateless managed Function.
+### Owner-restricted Azure pilot
 
-Before public deployment, implement and verify production database/storage adapters and migrations, managed keys, HTTPS authentication and cookie configuration, delivered-email ownership, shared abuse controls, durable background execution, backups/restoration, and retention/consent controls. Choose the resources and review their current cost before provisioning. These are release gates, not settings already enabled by this prototype.
+[Open Microsoft sign-in](https://applymate-personal.purplesand-17d722b5.eastus.azurecontainerapps.io/.auth/login/aad?post_login_redirect_uri=/). The pilot serves the actual frontend and Node backend together, not just a static landing page. The Microsoft account must match the configured tenant and owner. Acknowledge the cloud data notice before creating the workspace. Local email-code routes are disabled. Google sign-in and multi-user access are not implemented.
 
-**No ApplyMate Azure deployment is included or enabled.** The repository's `infra\main.bicep` and deployment workflow package **BroCalc only**. They do not upload ApplyMate, its local database, keys, or private documents.
+The pilot uses Container Apps Consumption with 0.5 CPU/1 GiB and one replica, a Basic container registry, private Azure Files, a managed-identity Blob lease, and Key Vault secret references. Domain payloads and documents retain application encryption; authentication metadata is not payload-encrypted. The cloud key and database are separate from local data. The deployment package excludes local databases, keys, resumes, tests, and private documents.
+
+This is a single-instance learning pilot: no high availability, automatic backups, disaster-recovery guarantee, or production-scale multi-user database. A Blob lease prevents two containers from opening the embedded database concurrently. Platform operational/access logs may exist even though the application does not log request bodies. The same-site referrer policy allows platform CSRF checks without sending referrers to other sites.
+
+`infra\applymate-pilot.bicep` provisions the foundation and takes secure secret parameters. **Never generate a replacement encryption key for an existing database or redeploy this template with a different key.** `infra\applymate-runtime.bicep` references existing keys and deploys the container and authentication; public ingress defaults off so authentication can be verified first. The repository's `infra\main.bicep` and original deployment workflow remain BroCalc-only.
+
+Build with `npm run build:applymate`, then run `node scripts\package-applymate.mjs`. Submit only `.deploy\applymate` to `az acr build`, never the repository root. Use a new image tag for each release. Explicitly scope Azure commands to the personal subscription and `rg-applymate-personal`; do not rely on CLI defaults.
+
+For updates, deactivate the current revision, allow at least 60 seconds for any remaining lease to expire, and update to the new image. Expect downtime; do not use overlapping rolling replicas. To stop compute, deactivate the current revision. To restore it, activate that revision with its original secrets and mounted storage. Registry and storage charges continue while compute is stopped.
+
+The pilot is bounded to one small replica, but that does not enforce a monthly spending cap. Check Azure Cost Management against the subscription's credit allowance; paid provider calls using optional model connections are separate. A current all-in cost estimate has not been verified. Before broader public use, add managed database adapters, tested backups/restoration, retention controls, multi-user abuse controls, and a separately reviewed authentication rollout.

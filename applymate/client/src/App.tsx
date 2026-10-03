@@ -82,6 +82,10 @@ export default function App() {
     return () => controller.abort();
   }, [path, userId, refresh]);
   async function signOut() {
+    if (capabilities?.mailMode === "microsoft") {
+      window.location.assign("/.auth/logout?post_logout_redirect_uri=/");
+      return;
+    }
     await api.request("/auth/sign-out", successSchema, { method: "POST", body: {} });
     api.reset(); setData(null); setError(""); setMenu(false); navigate("welcome");
   }
@@ -108,7 +112,7 @@ export default function App() {
     <aside className={`sidebar ${menu ? "is-open" : ""}`} aria-label="Workspace navigation">
       <a className="sidebar-brand" href="#overview" aria-label="ApplyMate overview"><Brand /></a>
       <nav>{navigation.map(({ id: item, label, icon: Icon, group }) => <div key={item}>{group && <p className="nav-group">{group}</p>}<a href={`#${item}`} className={`nav-link ${section === item || (item === "overview" && !navigation.some((entry) => entry.id === section)) ? "active" : ""}`} aria-current={section === item ? "page" : undefined}><Icon size={19} aria-hidden="true" />{label}{item === "applications" && data.applications.length > 0 && <span className="nav-count">{data.applications.length}</span>}</a></div>)}</nav>
-      <div className="sidebar-bottom"><div className="local-status"><ShieldCheck size={20} aria-hidden="true" /><div><strong>Local & in your control</strong><p>No cloud deployment</p></div></div>
+      <div className="sidebar-bottom"><div className="local-status"><ShieldCheck size={20} aria-hidden="true" /><div><strong>{data.capabilities.localOnly ? "Local & in your control" : "Private Azure pilot"}</strong><p>{data.capabilities.localOnly ? "No cloud deployment" : "Microsoft sign-in · Owner only"}</p></div></div>
         <div className="account-row"><span className="avatar">{(data.profile.fields.fullName.value || data.user.email).slice(0, 1).toUpperCase()}</span><div><strong>{data.profile.fields.fullName.value || "Your workspace"}</strong><span title={data.user.email}>{data.user.email}</span></div></div>
         <Button className="text-button signout" loading={account.busy} onClick={() => { void account.run(signOut); }}><LogOut size={16} aria-hidden="true" /> Sign out</Button>
       </div>
@@ -118,7 +122,7 @@ export default function App() {
       <main id="main-content" tabIndex={-1}>
         {error && <Notice tone="error">{error}<Button className="text-button" onClick={() => { void account.run(async () => { await refresh(); setError(""); }); }}>Refresh workspace</Button></Notice>}
         {account.feedback}{page}
-        <footer className="workspace-footer"><Brand /><span>Your facts. Your voice. Your final say.</span><span>Local milestone &middot; Review mode only</span></footer>
+        <footer className="workspace-footer"><Brand /><span>Your facts. Your voice. Your final say.</span><span>{data.capabilities.localOnly ? "Local milestone" : "Private online pilot"} &middot; Review mode only</span></footer>
       </main>
     </div>
   </div>;

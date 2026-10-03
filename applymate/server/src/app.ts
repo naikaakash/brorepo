@@ -22,13 +22,16 @@ import { Gateway } from "./gateway.js";
 import { packageHash, Tailoring } from "./tailoring.js";
 import { exportDocx, exportPdf } from "./exports.js";
 import { AppError, requireCondition } from "./errors.js";
+import { cloudIdentity } from "./cloud-identity.js";
+import type { CloudConfig } from "./cloud-identity.js";
+import { policyVersion } from "@applymate/contracts";
 
 interface Identity { id: string; email: string; name: string; sessionCreatedAt: Date }
 declare module "express-serve-static-core" {
   interface Locals { identity: Identity }
 }
 export interface AppConfig extends AuthConfig {
-  directory?: string; cipher: Cipher; gateway?: Gateway;
+  directory?: string; cipher: Cipher; gateway?: Gateway; cloud?: CloudConfig; frontend?: string;
 }
 const localHost = (hostname: string) => ["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname);
 const authRoutes = new Set([
@@ -47,7 +50,8 @@ const statusInput = z.object({
 }).strict();
 
 export async function createApp(config: AppConfig) {
-  requireCondition(config.origins.every((origin) => localHost(new URL(origin).hostname)) && localHost(new URL(config.origin).hostname),
+  requireCondition(config.cloud ? config.origin.startsWith("https://") && config.origins.length === 1 && config.origins[0] === config.origin :
+    config.origins.every((origin) => localHost(new URL(origin).hostname)) && localHost(new URL(config.origin).hostname),
     500, "LOCAL_ONLY", "This milestone is local-only. Public deployment requires the production release gates.");
   const database = new PGlite(config.directory);
   const store = new Store(database, config.cipher);
@@ -57,24 +61,30 @@ export async function createApp(config: AppConfig) {
   const gateway = config.gateway ?? new Gateway();
   const tailoring = new Tailoring(store, gateway);
   const app = express();
+  const localOnly = !config.cloud;
+  const mailMode = config.cloud ? "microsoft" as const : identity.mailMode;
   app.disable("x-powered-by");
-  app.use(helmet({ crossOriginResourcePolicy: { policy: "same-origin" } }));
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: "same-origin" },
+    referrerPolicy: { policy: config.cloud ? "same-origin" : "no-referrer" }
+  }));
   app.use((req, res, next) => {
     res.set("Cache-Control", "no-store");
-    if (!localHost(req.hostname)) return next(new AppError(403, "LOCAL_ONLY", "Only a loopback hostname is allowed."));
+    if (config.cloud ? req.hostname !== new URL(config.origin).hostname : !localHost(req.hostname)) return next(new AppError(403, "HOST_REJECTED", "This hostname is not allowed."));
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method) &&
       (!config.origins.includes(req.get("origin") ?? "") || req.get("x-applymate-request") !== "1")) {
       return next(new AppError(403, "ORIGIN_REJECTED", "This action must come from your local ApplyMate workspace."));
     }
     next();
   });
-  app.get("/api/health", (_req, res) => res.json({ status: "ok", product: "ApplyMate", localOnly: true }));
+  app.get("/api/health", (_req, res) => res.json({ status: "ok", product: "ApplyMate", localOnly }));
   app.get("/api/capabilities", (_req, res) => res.json({
-    localOnly: true, mailMode: identity.mailMode, engine: "Evidence-only local",
+    localOnly, mailMode, engine: "Evidence-only",
     automation: false, managedInbox: false, billing: false,
     limits: { documents: limits.documents, jobs: limits.jobs, dailyPackages: limits.dailyPackages }
   }));
   app.all("/api/auth/*splat", (req, _res, next) => {
+    if (config.cloud) return next(new AppError(404, "AUTH_ROUTE", "Use the hosting platform's Microsoft sign-in and sign-out."));
     if (req.method !== "POST" || !authRoutes.has(req.path)) return next(new AppError(404, "AUTH_ROUTE", "This authentication operation is not enabled."));
     const length = Number(req.get("content-length"));
     if (!Number.isInteger(length) || length < 1 || length > 16384 || req.get("transfer-encoding")) {
@@ -84,17 +94,40 @@ export async function createApp(config: AppConfig) {
   }, toNodeHandler(identity.auth));
   app.use(express.json({ limit: "768kb", strict: true }));
   app.post("/api/local-mail", (req, res) => {
-    requireCondition(identity.mailMode === "local", 404, "NOT_AVAILABLE", "Local mail preview is not enabled.");
+    requireCondition(!config.cloud && identity.mailMode === "local", 404, "NOT_AVAILABLE", "Local mail preview is not enabled.");
     const { email } = z.object({ email: z.email().max(254) }).strict().parse(req.body);
     const letter = identity.outbox.get(email.toLowerCase());
     requireCondition(letter && Date.parse(letter.expiresAt) > Date.now(), 404, "NO_LOCAL_MAIL", "There is no unexpired local code for this address. Request a new code.");
     res.json({ ...letter, notice: "Local development preview only. No email was delivered." });
   });
   app.get("/api/session", async (req, res) => {
+    if (config.cloud) {
+      const user = cloudIdentity(req, config.cloud);
+      const result = await database.query<{ id: string }>('SELECT id FROM "user" WHERE id=$1 AND "termsVersion"=$2', [user.id, policyVersion]);
+      return void res.json({ user: result.rows.length ? { id: user.id, email: user.email, name: user.name } : null });
+    }
     const session = await identity.auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
     res.json({ user: session ? { id: session.user.id, email: session.user.email, name: session.user.name } : null });
   });
+  app.post("/api/cloud-account", async (req, res) => {
+    requireCondition(config.cloud, 404, "NOT_AVAILABLE", "Microsoft pilot onboarding is not enabled.");
+    z.object({ consent: z.literal(true), policyVersion: z.literal(policyVersion) }).strict().parse(req.body);
+    const user = cloudIdentity(req, config.cloud);
+    await database.query(
+      `INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt","termsVersion")
+       VALUES ($1,$2,$3,true,now(),now(),$4)
+       ON CONFLICT (id) DO UPDATE SET name=$2,email=$3,"updatedAt"=now(),"termsVersion"=$4`,
+      [user.id, user.name, user.email, policyVersion]);
+    res.json({ saved: true });
+  });
   const signedIn: RequestHandler = async (req, res, next) => {
+    if (config.cloud) {
+      const user = cloudIdentity(req, config.cloud);
+      const result = await database.query<{ id: string }>('SELECT id FROM "user" WHERE id=$1 AND "termsVersion"=$2', [user.id, policyVersion]);
+      requireCondition(result.rows.length, 401, "CONSENT_REQUIRED", "Acknowledge the pilot's data notice before creating your workspace.");
+      res.locals.identity = user;
+      return next();
+    }
     const session = await identity.auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
     requireCondition(session && session.user.emailVerified, 401, "SIGN_IN_REQUIRED", "Sign in to your ApplyMate account to continue.");
     res.locals.identity = { id: session.user.id, email: session.user.email, name: session.user.name, sessionCreatedAt: session.session.createdAt };
@@ -130,7 +163,7 @@ export async function createApp(config: AppConfig) {
       answers: answers.map(({ value }) => value), connections: connections.map(({ value }) => value),
       activity: activity.map(({ value }) => value),
       capabilities: {
-        localOnly: true, mailMode: identity.mailMode, engine: "Evidence-only local",
+        localOnly, mailMode, engine: "Evidence-only",
         automation: false, managedInbox: false, billing: false,
         limits: { documents: limits.documents, jobs: limits.jobs, dailyPackages: limits.dailyPackages }
       }
@@ -335,6 +368,7 @@ export async function createApp(config: AppConfig) {
     res.json({ deleted: true });
   });
   app.use("/api", (_req, _res, next) => next(new AppError(404, "NOT_FOUND", "This operation is not available.")));
+  if (config.frontend) app.use(express.static(config.frontend, { index: "index.html" }));
   const errors: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
     if (res.headersSent) return _next(error);
     if (error instanceof AppError) return void res.status(error.status).json({ error: { code: error.code, message: error.message } });
