@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+.azure/
+.swa/
+playwright-report/
+test-results/
+*.log
+local.settings.json
+.deploy/

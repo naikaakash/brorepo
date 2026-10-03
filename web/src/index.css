@@ -1,0 +1,85 @@
+:root {
+  font-family: "Segoe UI Variable", "Segoe UI", sans-serif;
+  color: #e9f0fb;
+  background: #07101d;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --background: #07101d;
+  --surface: rgba(16, 28, 45, 0.84);
+  --surface-solid: #101c2d;
+  --surface-raised: #18263a;
+  --border: rgba(157, 176, 207, 0.16);
+  --text: #edf3fc;
+  --muted: #8f9db2;
+  --accent: #ff7a45;
+  --accent-strong: #ff9368;
+  --teal: #69e1ce;
+  --focus: #69e1ce;
+  --shadow: 0 30px 80px rgba(0, 0, 0, 0.36);
+}
+
+:root[data-theme="light"] {
+  color: #132034;
+  background: #edf3f8;
+  --background: #edf3f8;
+  --surface: rgba(255, 255, 255, 0.88);
+  --surface-solid: #fff;
+  --surface-raised: #eff4f8;
+  --border: rgba(24, 49, 78, 0.14);
+  --text: #132034;
+  --muted: #617087;
+  --teal: #00675a;
+  --accent-strong: #a93710;
+  --focus: #00675a;
+  --shadow: 0 30px 70px rgba(31, 51, 77, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--background);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 15% 12%, rgba(58, 128, 147, 0.18), transparent 30rem),
+    radial-gradient(circle at 85% 65%, rgba(255, 122, 69, 0.09), transparent 27rem),
+    var(--background);
+  color: var(--text);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

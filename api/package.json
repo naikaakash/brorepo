@@ -1,0 +1,31 @@
+{
+  "name": "@brorepo/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/functions/*.js",
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0"
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "dev": "npm run build && cross-env FUNCTIONS_WORKER_RUNTIME=node FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT=1 func start",
+    "lint": "eslint src --max-warnings 0",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.8.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.37.0",
+    "@types/node": "^22.18.9",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.37.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.45.0",
+    "vitest": "^3.2.4"
+  }
+}
