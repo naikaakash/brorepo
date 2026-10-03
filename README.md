@@ -23,7 +23,7 @@ Open `http://localhost:4174`, use a test email, request a code, and select **Ope
 
 See [ApplyMate setup, workflow, limitations, and hosting gates](applymate/README.md). Its frontend builds to static files, but the complete application also requires its API and persistent storage. **The Azure template and deployment workflow below deploy BroCalc only.** They do not publish ApplyMate.
 
-The separate **Publish ApplyMate frontend preview** workflow publishes a GitHub Pages landing preview from `feat/applymate`. This public build makes no API requests and accepts no personal data; account and document workflows remain available locally.
+The separate **Publish ApplyMate frontend preview** workflow publishes a GitHub Pages landing preview from `main`. This public build makes no API requests and accepts no personal data; account and document workflows remain available locally.
 
 ## BroCalc
 

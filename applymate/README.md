@@ -129,7 +129,7 @@ Browser tests use synthetic data, their own ephemeral database, and disabled ext
 
 ## Static website and Azure publishing
 
-The GitHub Pages release is an explicitly **frontend-only public preview**. It shows the landing page and local setup link without calling an API or accepting email addresses or resumes. The `Publish ApplyMate frontend preview` workflow publishes pushes on `feat/applymate`; it builds with `VITE_PUBLIC_PREVIEW=true`, repository-relative assets, and a separate `dist-public` directory so it does not replace the local full-stack build. It never uploads `.applymate`, backend data, or private documents.
+The GitHub Pages release is an explicitly **frontend-only public preview**. It shows the landing page and local setup link without calling an API or accepting email addresses or resumes. The `Publish ApplyMate frontend preview` workflow publishes pushes on `main`; it builds with `VITE_PUBLIC_PREVIEW=true`, repository-relative assets, and a separate `dist-public` directory so it does not replace the local full-stack build. It never uploads `.applymate`, backend data, or private documents.
 
 The local build remains fully interactive. Public sign-in and saved-data features are not enabled by this Pages release.
 

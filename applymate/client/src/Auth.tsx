@@ -47,7 +47,7 @@ export function Auth({ mailMode, signedIn, publicPreview = false }: { mailMode: 
         {publicPreview ? <div>
           <Notice>This is a public frontend preview. Sign-in, resume uploads, saved profiles, and document generation are available in the local full-stack build, not on this static site.</Notice>
           <p>The integrated local workflow includes confirmed candidate facts, writing-voice onboarding, job evidence mapping, reviewed PDF and Word exports, and manual application tracking.</p>
-          <a className="button primary full" href="https://github.com/naikaakash/brorepo/tree/feat/applymate">View source &amp; local setup <ArrowRight size={18} aria-hidden="true" /></a>
+          <a className="button primary full" href="https://github.com/naikaakash/brorepo/tree/main">View source &amp; local setup <ArrowRight size={18} aria-hidden="true" /></a>
           <p>No account or personal information is collected by this preview. Public account features require a production backend and delivered-email verification.</p>
         </div> : <><form onSubmit={(event) => {
           event.preventDefault();
