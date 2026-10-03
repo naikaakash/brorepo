@@ -11,7 +11,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -30,8 +30,11 @@ jobs:
       - name: Install browser
         run: npx playwright install --with-deps chromium
 
-      - name: Validate application
+      - name: Validate BroCalc
         run: npm run check
+
+      - name: Validate ApplyMate
+        run: npm run check:applymate
 
       - name: Validate infrastructure template
         run: az bicep build --file infra/main.bicep --stdout > /dev/null

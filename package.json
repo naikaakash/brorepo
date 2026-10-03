@@ -7,13 +7,23 @@
   },
   "workspaces": [
     "api",
-    "web"
+    "web",
+    "applymate/contracts",
+    "applymate/server",
+    "applymate/client"
   ],
   "scripts": {
     "build": "npm run build --workspace api && npm run build --workspace web",
     "check": "npm run lint && npm run typecheck && npm test && npm run test:e2e",
     "dev": "concurrently -k -n api,web -c cyan,magenta \"npm run dev --workspace api\" \"npm run dev --workspace web\"",
     "dev:api": "npm run dev --workspace api",
+    "dev:applymate": "npm run build --workspace @applymate/contracts && concurrently -k -n server,client \"npm run dev --workspace @applymate/server\" \"npm run dev --workspace @applymate/client\"",
+    "preview:applymate": "concurrently -k -n server,client \"npm run start --workspace @applymate/server\" \"npm run preview --workspace @applymate/client\"",
+    "build:applymate": "npm run build --workspace @applymate/contracts && npm run build --workspace @applymate/server && npm run build --workspace @applymate/client",
+    "typecheck:applymate": "npm run build --workspace @applymate/contracts && npm run typecheck --workspace @applymate/server && npm run typecheck --workspace @applymate/client && tsc -p applymate/tests/tsconfig.json",
+    "test:applymate": "npm run build --workspace @applymate/contracts && npm test --workspace @applymate/server && npm test --workspace @applymate/client",
+    "check:applymate": "npm run typecheck:applymate && npm run lint --workspace @applymate/server && npm run lint --workspace @applymate/client && npm run test:applymate && npm run build:applymate && npm run test:e2e:applymate",
+    "test:e2e:applymate": "playwright test --config applymate/playwright.config.ts",
     "package:api": "node scripts/package-api.mjs",
     "start:api": "cross-env FUNCTIONS_WORKER_RUNTIME=node FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT=1 func start --script-root .deploy/api",
     "lint": "npm run lint --workspace api && npm run lint --workspace web",

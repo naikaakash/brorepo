@@ -1,0 +1,52 @@
+name: Publish ApplyMate frontend preview
+
+on:
+  push:
+    branches: [feat/applymate]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: applymate-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace @applymate/contracts
+      - run: npm run lint --workspace @applymate/client
+      - run: npm test --workspace @applymate/client
+      - name: Build frontend-only public preview
+        run: npm run build --workspace @applymate/client
+        env:
+          VITE_PUBLIC_PREVIEW: "true"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: applymate/client/dist-public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish
+        id: deployment
+        uses: actions/deploy-pages@v4

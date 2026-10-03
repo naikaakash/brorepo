@@ -1,8 +1,35 @@
-# BroCalc
+# brorepo
+
+Two personal full-stack learning projects, with separate frontends, backends, and run commands.
+
+| Project | Scope | Local preview |
+|---|---|---|
+| **ApplyMate** | Resume-first candidate profiles, writing voice, job evidence, reviewed documents, and manual application tracking | `http://localhost:4174` |
+| **BroCalc** | Scientific calculator backed by an Azure Functions API | `http://localhost:4173` |
+
+## ApplyMate
+
+The first local integrated milestone is implemented, not the entire commercial automation platform. It uses real passwordless sessions and persistent server-owned data. The default sign-in code appears in an explicitly local email preview; it does not send email or prove ownership of an external mailbox.
+
+From the repository root:
+
+```powershell
+npm ci
+npm run build:applymate
+npm run preview:applymate
+```
+
+Open `http://localhost:4174`, use a test email, request a code, and select **Open local email preview**. Start with synthetic resume data.
+
+See [ApplyMate setup, workflow, limitations, and hosting gates](applymate/README.md). Its frontend builds to static files, but the complete application also requires its API and persistent storage. **The Azure template and deployment workflow below deploy BroCalc only.** They do not publish ApplyMate.
+
+The separate **Publish ApplyMate frontend preview** workflow publishes a GitHub Pages landing preview from `feat/applymate`. This public build makes no API requests and accepts no personal data; account and document workflows remain available locally.
+
+## BroCalc
 
 A polished scientific calculator with a React + TypeScript frontend and a bounded TypeScript API designed for Azure Static Web Apps managed Functions.
 
-## What it demonstrates
+### What it demonstrates
 
 - Responsive dark/light calculator UI with keyboard input and session-only history
 - Real backend calculations through `POST /api/calculate`
@@ -11,7 +38,7 @@ A polished scientific calculator with a React + TypeScript frontend and a bounde
 - Request, expression, token, nesting, domain, and finite-number limits
 - GitHub Actions CI, desktop/mobile browser tests, and a manually triggered Azure Static Web Apps deployment
 
-## Local setup
+### Local setup
 
 Use Node.js 22.12+ (22 LTS) or Node.js 24. CI and the Azure API use Node.js 22. Azure Functions Core Tools v4 is installed locally by `npm ci`; no global installation is needed.
 
@@ -28,7 +55,9 @@ Frontend edits reload automatically. After changing API code, restart `npm run d
 
 Keep ports 5173, 4173, and 7071 free for development/tests. Local servers are not public hosting.
 
-## Commands
+### Commands
+
+The commands in this table target BroCalc. ApplyMate uses the separate `:applymate` commands documented above.
 
 | Command | Purpose |
 |---|---|
@@ -50,7 +79,7 @@ npm run check
 
 Tests use Chromium at desktop and 320px mobile sizes; mobile emulation is not a claim of testing Safari on a physical iPhone. They cover real scientific calculations, history, errors, editing, cancellation, timeouts, full results, and automated accessibility checks in both themes. Automated checks are not a complete accessibility certification. No browser recordings or traces are retained.
 
-## API
+### API
 
 Request:
 
@@ -92,13 +121,13 @@ Semantics:
 
 The server is authoritative. The browser never computes a fallback answer, sends no per-keystroke calculation requests, cancels stale work when input/mode changes, and times out after eight seconds. History holds at most 12 entries in memory.
 
-## Privacy and operational logging
+### Privacy and operational logging
 
-The application contains no analytics SDK, telemetry integration, advertising, external fonts, database, account system, or persistent calculation history. History exists only in React memory and disappears on refresh.
+BroCalc contains no analytics SDK, telemetry integration, advertising, external fonts, database, account system, or persistent calculation history. History exists only in React memory and disappears on refresh. ApplyMate has its own persistent account and document data; see its separate privacy and storage notes.
 
 Normal local process output and standard GitHub/Azure security, access, build, and deployment logs may still exist. Those platform logs are outside the application's control. Core Tools telemetry is opted out for local startup. No Application Insights resource is provisioned. The only application diagnostic is a fixed message for unexpected failures; it contains no expression, body, or exception details.
 
-## Azure deployment
+### Azure deployment (BroCalc only)
 
 The included Bicep creates only an Azure Static Web Apps **Free** resource. Review names, region availability, permissions, policy, and current pricing before running it:
 
