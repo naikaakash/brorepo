@@ -75,3 +75,9 @@ export class ApiClient {
 }
 export const api = new ApiClient();
 export const cancelled = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
+
+export async function microsoftSignOut(destination = "/"): Promise<void> {
+  const response = await fetch("/.auth/logout", { credentials: "same-origin", redirect: "follow", signal: AbortSignal.timeout(15000) });
+  if (!response.ok) throw new ApiError("Microsoft sign-out failed. Retry before changing accounts.", "SIGN_OUT_FAILED", response.status);
+  window.location.assign(destination);
+}

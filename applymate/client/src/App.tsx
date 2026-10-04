@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BriefcaseBusiness, FileCheck2, Fingerprint, House, LogOut, Menu, MessagesSquare, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { capabilitySchema, workspaceSchema, z } from "@applymate/contracts";
 import type { Workspace } from "@applymate/contracts";
-import { api, cancelled, successSchema } from "./api";
+import { api, cancelled, microsoftSignOut, successSchema } from "./api";
 import { Auth } from "./Auth";
 import { Dashboard } from "./Dashboard";
 import { ProfilePage, VoicePage } from "./Candidate";
@@ -87,7 +87,7 @@ export default function App() {
   }, [path, userId, refresh]);
   async function signOut() {
     if (capabilities?.mailMode === "microsoft") {
-      window.location.assign("/.auth/logout?post_logout_redirect_uri=/");
+      await microsoftSignOut();
       return;
     }
     await api.request("/auth/sign-out", successSchema, { method: "POST", body: {} });
@@ -96,7 +96,7 @@ export default function App() {
   if (import.meta.env.VITE_PUBLIC_PREVIEW === "true") return <Auth publicPreview mailMode="local" signedIn={async () => { throw new Error("Authentication is unavailable in the public frontend preview."); }} />;
   if (booting) return <div className="boot-screen"><Brand /><p role="status">Opening ApplyMate...</p></div>;
   if (!capabilities) return <div className="boot-screen"><Brand /><Notice tone="error">{error || "The local API is unavailable."}</Notice><Button className="primary" onClick={() => { setBooting(true); setError(""); setBoot((value) => value + 1); }}>Try again</Button></div>;
-  if (!data) return <>{error && <div className="landing-alert"><Notice tone="warning">{error}{capabilities.mailMode === "microsoft" && <p><a className="button secondary" href="/.auth/logout?post_logout_redirect_uri=/">Sign out and return to landing</a></p>}</Notice></div>}<Auth mailMode={capabilities.mailMode} microsoftAuthenticated={microsoftAuthenticated} signedIn={async () => { setError(""); await refresh(); navigate("overview"); }} /></>;
+  if (!data) return <>{error && <div className="landing-alert"><Notice tone="warning">{error}{capabilities.mailMode === "microsoft" && <p><a className="button secondary" href="/.auth/logout?post_logout_redirect_uri=/" onClick={(event) => { event.preventDefault(); void account.run(() => microsoftSignOut()); }}>Sign out and return to landing</a></p>}</Notice>{account.feedback}</div>}<Auth mailMode={capabilities.mailMode} microsoftAuthenticated={microsoftAuthenticated} signedIn={async () => { setError(""); await refresh(); navigate("overview"); }} /></>;
   const [section, id] = path.split("/");
   const props: PageProps = { data, refresh, navigate };
   let page;

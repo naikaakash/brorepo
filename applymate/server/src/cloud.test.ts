@@ -93,7 +93,14 @@ describe("Azure owner-restricted pilot", () => {
       expect(two.documents).toHaveLength(0);
       expect((await api.get("/api/account/export").set(other)).body.profile.id).toBe(two.profile.id);
       const duplicateEmail = headers("55555555-5555-4555-8555-555555555555", "first@example.test");
-      expect((await api.post("/api/cloud-account").set(duplicateEmail).send({ consent: true, policyVersion })).status).toBe(409);
+      expect((await api.post("/api/cloud-account").set(duplicateEmail).send({ consent: true, policyVersion })).status).toBe(200);
+      const sameEmail = (await api.get("/api/workspace").set(duplicateEmail)).body;
+      expect(sameEmail.user.email).toBe(one.user.email);
+      expect(sameEmail.user.id).not.toBe(one.user.id);
+      expect(sameEmail.profile.id).not.toBe(one.profile.id);
+      expect((await api.get("/api/account/export").set(duplicateEmail)).body.profile.id).toBe(sameEmail.profile.id);
+      expect((await api.delete("/api/account").set(duplicateEmail).send({ confirmation: "DELETE" })).status).toBe(200);
+      expect((await api.get("/api/workspace").set(owner)).body.profile.id).toBe(one.profile.id);
       expect((await api.delete("/api/account").set(other).send({ confirmation: "DELETE" })).status).toBe(200);
       expect((await api.get("/api/workspace").set(owner)).body.profile.id).toBe(one.profile.id);
       expect((await api.get("/api/workspace").set(other)).status).toBe(401);

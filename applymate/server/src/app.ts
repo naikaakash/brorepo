@@ -55,7 +55,10 @@ export async function createApp(config: AppConfig) {
     500, "LOCAL_ONLY", "This milestone is local-only. Public deployment requires the production release gates.");
   const database = new PGlite(config.directory);
   const store = new Store(database, config.cipher);
-  try { await store.migrate(); }
+  try {
+    await store.migrate();
+    if (config.cloud) await database.exec('ALTER TABLE "user" DROP CONSTRAINT IF EXISTS user_email_key');
+  }
   catch (error) { await database.close(); throw error; }
   const identity = createIdentity(store, config.cipher, config);
   const gateway = config.gateway ?? new Gateway();
@@ -114,8 +117,6 @@ export async function createApp(config: AppConfig) {
     requireCondition(config.cloud, 404, "NOT_AVAILABLE", "Microsoft pilot onboarding is not enabled.");
     z.object({ consent: z.literal(true), policyVersion: z.literal(policyVersion) }).strict().parse(req.body);
     const user = cloudIdentity(req, config.cloud);
-    const emailOwner = await database.query<{ id: string }>('SELECT id FROM "user" WHERE email=$1 AND id<>$2', [user.email, user.id]);
-    requireCondition(!emailOwner.rows.length, 409, "ACCOUNT_IDENTITY", "This email already belongs to another Microsoft identity. Sign in with the original account; identities are not linked automatically.");
     const created = await database.query<{ id: string }>(
       `INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt","termsVersion")
        SELECT $1,$2,$3,true,now(),now(),$4
