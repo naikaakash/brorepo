@@ -65,7 +65,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           { name: 'APPLYMATE_ORIGIN', value: origin }
           { name: 'APPLYMATE_TENANT', value: tenant().tenantId }
           { name: 'APPLYMATE_OWNER', value: ownerObjectId }
-          { name: 'APPLYMATE_PUBLIC_SIGNUP', value: string(publicSignup) }
+          { name: 'APPLYMATE_PUBLIC_SIGNUP', value: publicSignup ? 'true' : 'false' }
           { name: 'APPLYMATE_DATA_DIR', value: '/home/applymate' }
           { name: 'APPLYMATE_DATA_KEY', secretRef: 'data-key' }
           { name: 'APPLYMATE_IDENTITY_CLIENT_ID', value: identity.properties.clientId }
