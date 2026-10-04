@@ -99,7 +99,7 @@ resource auth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
           clientSecretSettingName: 'microsoft-login'
           openIdIssuer: 'https://login.microsoftonline.com/${tenant().tenantId}/v2.0'
         }
-        login: { loginParameters: ['scope=openid profile email', 'prompt=select_account'] }
+        login: { loginParameters: ['scope=openid profile email', 'prompt=login'] }
         validation: {
           allowedAudiences: [microsoftClientId]
           defaultAuthorizationPolicy: { allowedPrincipals: { identities: [ownerObjectId] } }

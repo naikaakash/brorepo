@@ -135,7 +135,9 @@ export async function createApp(config: AppConfig) {
   };
   const fresh: RequestHandler = (_req, res, next) => {
     requireCondition(Date.now() - res.locals.identity.sessionCreatedAt.getTime() <= 300000,
-      403, "REAUTHENTICATE", "For this sensitive action, sign out and verify a new email code first.");
+      403, "REAUTHENTICATE", config.cloud ?
+        "For this sensitive action, use Verify Microsoft sign-in again in Settings, then retry within five minutes. Nothing was deleted." :
+        "For this sensitive action, sign out and verify a new email code first.");
     next();
   };
   app.use("/api", signedIn);

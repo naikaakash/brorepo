@@ -39,7 +39,11 @@ describe("Azure owner-restricted pilot", () => {
       expect((await api.post("/api/auth/email-otp/send-verification-otp").set(headers).send({ email: "pilot@example.test", type: "sign-in" })).status).toBe(404);
       expect((await api.post("/api/cloud-account").set(headers).set("Origin", "https://attacker.test").send({ consent: true, policyVersion })).status).toBe(403);
       const stale = principal(cloud.objectId, Math.floor(Date.now() / 1000) - 600);
-      expect((await api.delete("/api/account").set(headers).set("X-MS-CLIENT-PRINCIPAL", stale).send({ confirmation: "DELETE" })).status).toBe(403);
+      const denied = await api.delete("/api/account").set(headers).set("X-MS-CLIENT-PRINCIPAL", stale).send({ confirmation: "DELETE" });
+      expect(denied.status).toBe(403);
+      expect(denied.body.error).toMatchObject({ code: "REAUTHENTICATE", message: expect.stringContaining("Verify Microsoft sign-in again") });
+      expect((await api.get("/api/workspace").set(headers)).status).toBe(200);
+      expect((await api.delete("/api/account").set(headers).send({ confirmation: "delete" })).status).toBe(400);
       expect((await api.delete("/api/account").set(headers).send({ confirmation: "DELETE" })).status).toBe(200);
       expect((await api.get("/api/session").set(headers)).body.user).toBeNull();
       expect((await api.get("/api/workspace").set(headers)).status).toBe(401);
