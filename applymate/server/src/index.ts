@@ -12,6 +12,7 @@ const dataRoot = resolve(root, process.env.APPLYMATE_DATA_DIR ?? ".applymate/loc
 const port = Number(process.env.PORT ?? process.env.APPLYMATE_PORT ?? 7072);
 const origin = process.env.APPLYMATE_ORIGIN ?? "http://localhost:4174";
 const origins = [...new Set([origin, "http://localhost:5174", "http://127.0.0.1:5174", "http://localhost:4174", "http://127.0.0.1:4174"])];
+const databaseUrl = process.env.APPLYMATE_DATABASE_URL;
 
 async function acquireLock(): Promise<() => Promise<void>> {
   await mkdir(dataRoot, { recursive: true, mode: 0o700 });
@@ -52,6 +53,7 @@ async function main() {
     const cipher = await loadCipher(dataRoot, process.env.APPLYMATE_DATA_KEY);
     runtime = await createApp({
       directory: join(dataRoot, "postgres"), cipher, origin, origins: cloud ? [origin] : origins,
+      databaseUrl, databasePoolSize: Number(process.env.APPLYMATE_DATABASE_POOL_SIZE ?? 5),
       smtpUrl: cloud ? undefined : process.env.APPLYMATE_SMTP_URL, smtpFrom: cloud ? undefined : process.env.APPLYMATE_SMTP_FROM,
       ...(cloud ? {
         cloud: { tenant: process.env.APPLYMATE_TENANT!, objectId: process.env.APPLYMATE_OWNER!, publicSignup: process.env.APPLYMATE_PUBLIC_SIGNUP === "true" },

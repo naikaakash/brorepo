@@ -21,6 +21,7 @@
     "mammoth": "1.12.3",
     "multer": "2.4.0",
     "nodemailer": "10.0.10",
+    "pg": "8.23.0",
     "pdfmake": "0.2.20",
     "unpdf": "1.8.1",
     "yauzl": "3.4.0"
@@ -28,6 +29,7 @@
   "devDependencies": {
     "@types/express": "5.0.6", "@types/multer": "2.2.0",
     "@types/node": "^22.18.9", "@types/nodemailer": "8.0.2",
+    "@types/pg": "8.23.1",
     "@types/pdfmake": "0.2.13", "@types/supertest": "7.2.1",
     "@types/yauzl": "3.4.0",
     "supertest": "7.3.0", "tsx": "4.23.15",

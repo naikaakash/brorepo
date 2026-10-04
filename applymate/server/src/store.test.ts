@@ -98,9 +98,15 @@ describe("owned, immutable, persistent local storage", () => {
 
   it("rejects the wrong key without replacing existing data, including legacy marker initialization", async () => {
     const wrong = new Cipher(randomBytes(32));
+    await withStore(async (store) => {
+      // Model a pre-versioning database while retaining its encrypted owned records.
+      await store.database.exec("DROP TABLE schema_migrations");
+    });
     await expect(withStore(async () => undefined, wrong)).rejects.toMatchObject({ code: "KEY_MISMATCH" });
     await withStore(async (store) => {
       expect(await store.getPrivate(owner, connection.id, "key")).toBe("synthetic-private-key");
+      const applied = await store.database.query<{ version: number }>("SELECT version FROM schema_migrations");
+      expect(applied.rows).toEqual([{ version: 1 }]);
       await store.database.query("DELETE FROM storage_metadata WHERE key = 'cipher'");
     });
     await expect(withStore(async () => undefined, wrong)).rejects.toMatchObject({ code: "KEY_MISMATCH" });

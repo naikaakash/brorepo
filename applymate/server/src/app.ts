@@ -4,6 +4,7 @@ import helmet from "helmet";
 import multer from "multer";
 import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
 import { PGlite } from "@electric-sql/pglite";
+import { PostgresDatabase } from "./database.js";
 import {
   activitySchema, answerInputSchema, answerSchema, applicationSchema, applicationStates, connectionInputSchema,
   connectionSchema, documentSchema, idSchema, jobInputSchema, jobSchema, limits, packageSchema,
@@ -32,6 +33,7 @@ declare module "express-serve-static-core" {
 }
 export interface AppConfig extends AuthConfig {
   directory?: string; cipher: Cipher; gateway?: Gateway; cloud?: CloudConfig; frontend?: string;
+  databaseUrl?: string; databasePoolSize?: number;
 }
 const localHost = (hostname: string) => ["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname);
 const authRoutes = new Set([
@@ -53,14 +55,17 @@ export async function createApp(config: AppConfig) {
   requireCondition(config.cloud ? config.origin.startsWith("https://") && config.origins.length === 1 && config.origins[0] === config.origin :
     config.origins.every((origin) => localHost(new URL(origin).hostname)) && localHost(new URL(config.origin).hostname),
     500, "LOCAL_ONLY", "This milestone is local-only. Public deployment requires the production release gates.");
-  const database = new PGlite(config.directory);
+  requireCondition(!config.databaseUrl || config.cloud, 500, "DATABASE_CONFIG",
+    "External PostgreSQL is enabled only with trusted cloud identity; local OTP uses its isolated embedded database.");
+  const database = config.databaseUrl ? new PostgresDatabase(config.databaseUrl, config.databasePoolSize) : new PGlite(config.directory);
   const store = new Store(database, config.cipher);
   try {
-    await store.migrate();
-    if (config.cloud) await database.exec('ALTER TABLE "user" DROP CONSTRAINT IF EXISTS user_email_key');
+    await store.migrate(Boolean(config.cloud));
   }
   catch (error) { await database.close(); throw error; }
-  const identity = createIdentity(store, config.cipher, config);
+  let identity: ReturnType<typeof createIdentity>;
+  try { identity = createIdentity(store, config.cipher, config); }
+  catch (error) { await database.close(); throw error; }
   const gateway = config.gateway ?? new Gateway();
   const tailoring = new Tailoring(store, gateway);
   const app = express();

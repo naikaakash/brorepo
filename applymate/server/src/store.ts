@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { PGlite } from "@electric-sql/pglite";
+import { PostgresDatabase } from "./database.js";
+import type { Database, Queryable } from "./database.js";
 import { activitySchema, objectSchemas } from "@applymate/contracts";
 import type { EntityMap, ObjectKind, z } from "@applymate/contracts";
 import type { Cipher } from "./crypto.js";
 import { AppError, requireCondition } from "./errors.js";
 
-type Queryable = Pick<PGlite, "query" | "exec">;
 interface Row { id: string; owner: string; kind: ObjectKind; payload: string; revision: number; locked: boolean }
 export interface Stored<T> { value: T; revision: number; locked: boolean }
 
@@ -64,10 +64,33 @@ CREATE TABLE IF NOT EXISTS operation_limits (
 `;
 
 export class Store {
-  constructor(public readonly database: PGlite, private readonly cipher: Cipher, private readonly connection: Queryable = database) {}
+  constructor(public readonly database: Database, private readonly cipher: Cipher, private readonly connection: Queryable = database) {}
 
-  async migrate() {
-    await this.connection.exec(migration);
+  async migrate(cloud = false) {
+    await this.database.transaction(async (tx) => {
+      if (this.database instanceof PostgresDatabase) await tx.query("SELECT pg_advisory_xact_lock(641732091)");
+      await tx.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+        version integer PRIMARY KEY, name text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now()
+      )`);
+      const applied = await tx.query<{ version: number }>("SELECT version FROM schema_migrations");
+      const versions = new Set(applied.rows.map((row) => row.version));
+      requireCondition([...versions].every((version) => version === 1 || version === 2),
+        500, "MIGRATION_VERSION", "The database schema is newer than this application. Do not downgrade it.");
+      requireCondition(cloud || !versions.has(2), 500, "DATABASE_IDENTITY",
+        "This database contains cloud identities. Do not open it with local email-code authentication.");
+      if (!versions.has(1)) {
+        await tx.exec(migration);
+        await tx.query("INSERT INTO schema_migrations(version,name) VALUES (1,'existing_owned_storage')");
+      }
+      if (cloud && !versions.has(2)) {
+        await tx.exec('ALTER TABLE "user" DROP CONSTRAINT IF EXISTS user_email_key');
+        await tx.query("INSERT INTO schema_migrations(version,name) VALUES (2,'cloud_identity_email')");
+      }
+      await new Store(this.database, this.cipher, tx).verifyCipher();
+    });
+  }
+
+  private async verifyCipher() {
     const marker = await this.connection.query<{ value: string }>("SELECT value FROM storage_metadata WHERE key = 'cipher'");
     try {
       if (marker.rows[0]) {

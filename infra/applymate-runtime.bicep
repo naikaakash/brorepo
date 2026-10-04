@@ -5,6 +5,11 @@ param microsoftClientId string
 param imageTag string
 param publicIngress bool = false
 param publicSignup bool = false
+@description('Optional existing Key Vault PostgreSQL URL secret. Set only after verified data cutover; empty retains PGlite.')
+param databaseSecretUri string = ''
+@minValue(1)
+@maxValue(20)
+param databasePoolSize int = 5
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: 'amstore${suffix}'
@@ -50,17 +55,19 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       activeRevisionsMode: 'Single'
       ingress: { external: publicIngress, targetPort: 8080, allowInsecure: false }
       registries: [{ server: 'amregistry${suffix}.azurecr.io', identity: identity.id }]
-      secrets: [
+      secrets: concat([
         { name: 'data-key', keyVaultUrl: 'https://amkeys${suffix}.vault.azure.net/secrets/data-key', identity: identity.id }
         { name: 'microsoft-login', keyVaultUrl: 'https://amkeys${suffix}.vault.azure.net/secrets/microsoft-login', identity: identity.id }
-      ]
+      ], empty(databaseSecretUri) ? [] : [
+        { name: 'database-url', keyVaultUrl: databaseSecretUri, identity: identity.id }
+      ])
     }
     template: {
       containers: [{
         name: 'applymate'
         image: 'amregistry${suffix}.azurecr.io/applymate:${imageTag}'
         resources: { cpu: json('0.5'), memory: '1Gi' }
-        env: [
+        env: concat([
           { name: 'APPLYMATE_CLOUD', value: 'azure' }
           { name: 'APPLYMATE_ORIGIN', value: origin }
           { name: 'APPLYMATE_TENANT', value: tenant().tenantId }
@@ -70,7 +77,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           { name: 'APPLYMATE_DATA_KEY', secretRef: 'data-key' }
           { name: 'APPLYMATE_IDENTITY_CLIENT_ID', value: identity.properties.clientId }
           { name: 'APPLYMATE_LEASE_URL', value: 'https://${storage.name}.blob.core.windows.net/runtime/lease' }
-        ]
+        ], empty(databaseSecretUri) ? [] : [
+          { name: 'APPLYMATE_DATABASE_URL', secretRef: 'database-url' }
+          { name: 'APPLYMATE_DATABASE_POOL_SIZE', value: string(databasePoolSize) }
+        ])
         volumeMounts: [{ volumeName: 'private-data', mountPath: '/home/applymate' }]
         probes: [
           { type: 'Startup', tcpSocket: { port: 8080 }, initialDelaySeconds: 5, periodSeconds: 10, failureThreshold: 30 }

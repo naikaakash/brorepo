@@ -3,7 +3,9 @@ import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { emailOTP } from "better-auth/plugins";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
-import { drizzle } from "drizzle-orm/pglite";
+import { drizzle as embeddedDrizzle } from "drizzle-orm/pglite";
+import { drizzle as postgresDrizzle } from "drizzle-orm/node-postgres";
+import { PostgresDatabase } from "./database.js";
 import nodemailer from "nodemailer";
 import { policyVersion } from "@applymate/contracts";
 import type { Store } from "./store.js";
@@ -21,7 +23,8 @@ export function createIdentity(store: Store, cipher: Cipher, config: AuthConfig)
     baseURL: config.origin,
     trustedOrigins: config.origins,
     secret: cipher.authSecret(),
-    database: drizzleAdapter(drizzle(store.database), { provider: "pg", schema }),
+    database: drizzleAdapter(store.database instanceof PostgresDatabase ?
+      postgresDrizzle(store.database.pool) : embeddedDrizzle(store.database), { provider: "pg", schema }),
     telemetry: { enabled: false },
     logger: {
       level: "error",

@@ -2,6 +2,11 @@
 
 A resume-first application workspace built with React/TypeScript, an Express API, and embedded PostgreSQL through PGlite. Local mode uses Better Auth; the public Azure test uses platform Microsoft authentication for private workspaces. This is the first integrated intelligence milestone, not a finished commercial auto-apply service.
 
+The Astra specification is being applied incrementally. See [the architecture and phased
+implementation map](ARCHITECTURE.md) for the audit, gaps, dependencies and acceptance
+boundaries. The first foundation milestone adds optional pooled PostgreSQL and versioned
+migrations; it does not enable Auto Apply or cut over the current live database.
+
 ## Run locally
 
 Use the repository's supported Node.js versions: 22.12+ within Node 22, or Node 24. Run commands from the repository root:
@@ -48,7 +53,7 @@ The Answer Library supports versioned user-confirmed responses. Only the latest 
 | Candidate data | Persistent owned profiles, original resumes, typed fact proposals, explicit confirmation, and revision-checked selected merges |
 | Voice | Contextual writing interview and immutable saved Voice Profile versions |
 | Jobs | Manual import, hard filters, conservative lexical evidence mapping, and saved requirements |
-| Documents | Durable local generation queue, independent check steps, saved review decisions, immutable approved snapshots, and actual PDF/DOCX files |
+| Documents | Persisted package states with in-process generation and independent check steps, saved review decisions, immutable approved snapshots, and actual PDF/DOCX files |
 | Applications | Saved job/profile/voice/document/answer snapshots and evidence-bearing, user-reported timelines |
 | Settings | Optional model connections, workspace JSON export, and deletion of live account data |
 
@@ -95,10 +100,46 @@ Set environment variables in the process that starts the API; its entrypoint doe
 | `APPLYMATE_API_URL` | Built frontend preview's API proxy target; needed if changing the API port |
 | `APPLYMATE_SMTP_URL` | Optional SMTP transport URL; may contain credentials |
 | `APPLYMATE_SMTP_FROM` | Required sender address when SMTP is enabled |
+| `APPLYMATE_DATABASE_URL` | Optional PostgreSQL connection URL, cloud identity mode only; store as a managed secret, never browser configuration |
+| `APPLYMATE_DATABASE_POOL_SIZE` | Maximum PostgreSQL connections per API process; integer 1-20, default 5 |
 
 The development proxy uses 7072. Prefer the defaults; changing the API port also requires adjusting the development proxy. Local mode intentionally rejects production mode and non-loopback hosting/origins. Do not disable those guards or tunnel the local server to publish it. Azure private APIs require trusted platform identity, per-account authorization, HTTPS, managed keys, and persistent storage.
 
 SMTP mode sends real verification email and disables the local inbox preview. Configure an account and sender you control; no mail provider or domain is provisioned automatically.
+
+### PostgreSQL foundation and migration gate
+
+Without `APPLYMATE_DATABASE_URL`, PGlite behavior and existing data paths are unchanged.
+External PostgreSQL is opt-in and currently restricted to trusted cloud identity mode.
+The Drizzle identity adapter supports both connections, but exposing local OTP or mailbox
+preview on a public PostgreSQL-backed service remains prohibited.
+
+Use `postgresql://USER:PASSWORD@HOST:5432/DATABASE`, URL-encoding credentials as needed.
+URL query parameters are rejected so they cannot override host, TLS or timeouts.
+Non-loopback hosts require certificate-verified TLS; insecure remote TLS is not supported.
+Connection acquisition and idle connections are bounded, as are statements and idle
+transactions. An idle pool error logs only a fixed operational message.
+
+Startup applies migrations in one transaction, verifies the original encryption-key
+sentinel, and rejects unknown migration versions. PostgreSQL startup migrations use
+an advisory transaction lock. Existing pilot/local tables are adopted non-destructively;
+cloud email uniqueness removal is recorded separately. Keep the original encryption key.
+This is schema migration, **not data transfer** between PGlite and PostgreSQL.
+
+Do not set a new database URL on the live pilot as a shortcut to migration. Data-cutover
+tooling and a verified encrypted backup/restore rehearsal are still required. Stop writers,
+restore into an empty target with the same key, verify ownership/counts/decryptability,
+rehearse rollback, and only then switch configuration. No paid PostgreSQL resource is
+created by this change. The current Azure runtime template continues to use PGlite.
+After the cutover gate, its optional `databaseSecretUri` parameter can reference an
+existing Key Vault connection-URL secret accessible to the managed identity, with
+`databasePoolSize` bounded to 1-20. Leave that parameter empty for the current pilot;
+no connection string is placed in template outputs or plain-text environment values.
+
+Keep the runtime lease, one API instance and current signup limits. Tailoring still
+processes work inside the API; pooled PostgreSQL alone does not make generation safe
+across replicas. Durable atomic claiming and independent workers are the next foundation
+milestone. Never remove the lease or raise replica counts before that work is verified.
 
 ### Optional model connections
 
@@ -126,6 +167,14 @@ npm run check:applymate
 | `npm run check:applymate` | Type checks, lint, unit/component tests, builds, and browser tests |
 
 Browser tests use synthetic data, their own ephemeral database, and disabled external model calls. They do not touch the persistent preview or use SMTP. They exercise desktop and 320px mobile Chromium, real PDF/DOCX upload/download, merges, review/approval, account isolation/deletion, errors, and keyboard interaction. Automated accessibility scans are included; this is not a complete accessibility certification or a physical Safari test.
+
+CI also runs the PostgreSQL adapter against a real, ephemeral PostgreSQL 17 service.
+For a local equivalent, supply `APPLYMATE_TEST_DATABASE_URL` pointing only to a loopback
+database named `applymate_foundation_test`, then run
+`npm run test --workspace @applymate/server -- postgres.integration.test.ts`.
+Use only synthetic data: this suite creates schema/records and tests deletion and
+migration rollback. Without that test variable the PostgreSQL suite is explicitly skipped;
+passing local PGlite tests is not evidence that the pooled PostgreSQL suite ran.
 
 ## Static website and Azure publishing
 
