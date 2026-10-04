@@ -4,6 +4,7 @@ param ownerObjectId string
 param microsoftClientId string
 param imageTag string
 param publicIngress bool = false
+param publicSignup bool = false
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: 'amstore${suffix}'
@@ -64,6 +65,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           { name: 'APPLYMATE_ORIGIN', value: origin }
           { name: 'APPLYMATE_TENANT', value: tenant().tenantId }
           { name: 'APPLYMATE_OWNER', value: ownerObjectId }
+          { name: 'APPLYMATE_PUBLIC_SIGNUP', value: string(publicSignup) }
           { name: 'APPLYMATE_DATA_DIR', value: '/home/applymate' }
           { name: 'APPLYMATE_DATA_KEY', secretRef: 'data-key' }
           { name: 'APPLYMATE_IDENTITY_CLIENT_ID', value: identity.properties.clientId }
@@ -87,7 +89,7 @@ resource auth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
   properties: {
     platform: { enabled: true }
     globalValidation: {
-      unauthenticatedClientAction: 'RedirectToLoginPage'
+      unauthenticatedClientAction: 'AllowAnonymous'
       redirectToProvider: 'azureactivedirectory'
     }
     httpSettings: { requireHttps: true }
@@ -97,12 +99,12 @@ resource auth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
         registration: {
           clientId: microsoftClientId
           clientSecretSettingName: 'microsoft-login'
-          openIdIssuer: 'https://login.microsoftonline.com/${tenant().tenantId}/v2.0'
+          openIdIssuer: 'https://login.microsoftonline.com/${publicSignup ? 'common' : tenant().tenantId}/v2.0'
         }
         login: { loginParameters: ['scope=openid profile email', 'prompt=login'] }
         validation: {
           allowedAudiences: [microsoftClientId]
-          defaultAuthorizationPolicy: { allowedPrincipals: { identities: [ownerObjectId] } }
+          defaultAuthorizationPolicy: publicSignup ? {} : { allowedPrincipals: { identities: [ownerObjectId] } }
         }
       }
     }

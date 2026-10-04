@@ -1,6 +1,6 @@
 # ApplyMate
 
-A resume-first application workspace built with React/TypeScript, an Express API, and embedded PostgreSQL through PGlite. Local mode uses Better Auth; the owner-restricted Azure pilot uses platform Microsoft authentication. This is the first integrated intelligence milestone, not a finished commercial auto-apply service.
+A resume-first application workspace built with React/TypeScript, an Express API, and embedded PostgreSQL through PGlite. Local mode uses Better Auth; the public Azure test uses platform Microsoft authentication for private workspaces. This is the first integrated intelligence milestone, not a finished commercial auto-apply service.
 
 ## Run locally
 
@@ -96,7 +96,7 @@ Set environment variables in the process that starts the API; its entrypoint doe
 | `APPLYMATE_SMTP_URL` | Optional SMTP transport URL; may contain credentials |
 | `APPLYMATE_SMTP_FROM` | Required sender address when SMTP is enabled |
 
-The development proxy uses 7072. Prefer the defaults; changing the API port also requires adjusting the development proxy. Local mode intentionally rejects production mode and non-loopback hosting/origins. Do not disable those guards or tunnel the local server to publish it. Azure mode requires explicit platform identity, owner restrictions, HTTPS, managed keys, and persistent storage.
+The development proxy uses 7072. Prefer the defaults; changing the API port also requires adjusting the development proxy. Local mode intentionally rejects production mode and non-loopback hosting/origins. Do not disable those guards or tunnel the local server to publish it. Azure private APIs require trusted platform identity, per-account authorization, HTTPS, managed keys, and persistent storage.
 
 SMTP mode sends real verification email and disables the local inbox preview. Configure an account and sender you control; no mail provider or domain is provisioned automatically.
 
@@ -135,11 +135,13 @@ The local build remains fully interactive. Public sign-in and saved-data feature
 
 `npm run build:applymate` produces a static frontend in `applymate\client\dist`. Public static hosting can serve those files, but the current client also expects a same-origin `/api`. Uploading only the frontend does not provide authentication, persistence, queues, or document generation.
 
-### Owner-restricted Azure pilot
+### Public Azure test
 
-[Open Microsoft sign-in](https://applymate-personal.purplesand-17d722b5.eastus.azurecontainerapps.io/.auth/login/aad?post_login_redirect_uri=/). The pilot serves the actual frontend and Node backend together, not just a static landing page. The Microsoft account must match the configured tenant and owner. Acknowledge the cloud data notice before creating the workspace. Local email-code routes are disabled. Google sign-in and multi-user access are not implemented.
+[Open ApplyMate](https://applymate-personal.purplesand-17d722b5.eastus.azurecontainerapps.io/). The landing page is public without a login redirect. Choose **Continue with Microsoft** to sign in with a personal or work/school Microsoft account, then acknowledge the cloud data notice before creating a private workspace. Organization policies may require administrator consent. Use synthetic resumes: this is a learning test, not production storage. The frontend and backend run together; private API routes require authentication and account ownership. Local email-code routes are disabled. Google and other OAuth providers are not configured; each needs its own registration and securely stored credentials.
 
-Account deletion and provider-key actions require authentication within five minutes. In Settings, use **Verify Microsoft sign-in again** to clear the platform session and complete a fresh Microsoft login, then return to Settings and explicitly confirm the action. Unsaved form changes are lost on navigation. Reauthentication never deletes data automatically, and an expired sign-in leaves the workspace intact.
+Public signup is explicitly enabled with `publicSignup=true` in the runtime template and a Microsoft registration supporting personal and organizational accounts. Without that flag, private access remains owner-restricted. Cloud signup is limited to 100 stored accounts. Different Microsoft identities remain separate even when an email matches; email collisions are rejected rather than automatically linking accounts.
+
+Account deletion and provider-key actions require authentication within five minutes. In Settings, click the prominent **Verify Microsoft sign-in to delete** button to clear the platform session and complete a fresh Microsoft login. Back in Settings, type `DELETE` and submit within five minutes. Unsaved form changes are lost on navigation. Reauthentication never deletes data automatically, and an expired sign-in leaves the workspace intact.
 
 The pilot uses Container Apps Consumption with 0.5 CPU/1 GiB and one replica, a Basic container registry, private Azure Files, a managed-identity Blob lease, and Key Vault secret references. Domain payloads and documents retain application encryption; authentication metadata is not payload-encrypted. The cloud key and database are separate from local data. The deployment package excludes local databases, keys, resumes, tests, and private documents.
 
@@ -149,6 +151,6 @@ This is a single-instance learning pilot: no high availability, automatic backup
 
 Build with `npm run build:applymate`, then run `node scripts\package-applymate.mjs`. Submit only `.deploy\applymate` to `az acr build`, never the repository root. Use a new image tag for each release. Explicitly scope Azure commands to the personal subscription and `rg-applymate-personal`; do not rely on CLI defaults.
 
-For updates, deactivate the current revision, allow at least 60 seconds for any remaining lease to expire, and update to the new image. Expect downtime; do not use overlapping rolling replicas. To stop compute, deactivate the current revision. To restore it, activate that revision with its original secrets and mounted storage. Registry and storage charges continue while compute is stopped.
+For updates, record the current revision, deploy the new image, and explicitly deactivate the previous revision after the new revision is created. Single revision mode may reactivate the old revision while the new one waits for its lease, even if it was deactivated before deployment. Allow at least 60 seconds after the old process stops, then verify only the new revision is active, its replica is ready, and the public health endpoint responds. Avoid restarting a ready replica: restart can temporarily create another contender. Expect downtime; never bypass the lease or permit overlapping database writers. To stop compute, deactivate the active revision and verify it stays stopped. To restore it, activate that revision with its original secrets and mounted storage. Registry and storage charges continue while compute is stopped.
 
 The pilot is bounded to one small replica, but that does not enforce a monthly spending cap. Check Azure Cost Management against the subscription's credit allowance; paid provider calls using optional model connections are separate. A current all-in cost estimate has not been verified. Before broader public use, add managed database adapters, tested backups/restoration, retention controls, multi-user abuse controls, and a separately reviewed authentication rollout.

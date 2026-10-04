@@ -12,6 +12,11 @@ describe("account deletion", () => {
     const deleted = vi.fn();
     render(<SettingsPage data={data} refresh={vi.fn()} navigate={vi.fn()} deleted={deleted} />);
     const link = screen.getByRole("link", { name: "Verify Microsoft sign-in again" });
+    expect(link).toHaveClass("button", "secondary");
+    const deleteVerification = screen.getByRole("link", { name: "Verify Microsoft sign-in to delete" });
+    expect(deleteVerification).toHaveClass("button", "primary");
+    expect(deleteVerification).toBeVisible();
+    expect(deleteVerification).toHaveAttribute("href", link.getAttribute("href"));
     const logout = new URL(link.getAttribute("href")!, "https://applymate.test");
     expect(logout.pathname).toBe("/.auth/logout");
     const login = new URL(logout.searchParams.get("post_logout_redirect_uri")!, logout.origin);

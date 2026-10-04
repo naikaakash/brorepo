@@ -11,6 +11,26 @@ afterEach(() => {
 });
 
 describe("live workspace rather than a mock dashboard", () => {
+  it.each([false, true])("boots cloud authentication without requesting private data before consent (authenticated=%s)", async (authenticated) => {
+    const data = workspaceFixture();
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (path) => {
+      if (String(path).endsWith("/capabilities")) return Response.json({ ...data.capabilities, localOnly: false, mailMode: "microsoft" });
+      if (String(path).endsWith("/session")) return Response.json({ user: null, authenticated });
+      throw new Error(`Unexpected private request: ${String(path)}`);
+    });
+    vi.stubGlobal("fetch", fetcher);
+    render(<App />);
+    await screen.findByRole("heading", { name: "Meet your next chapter." });
+    if (authenticated) {
+      expect(screen.getByRole("checkbox")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Open my online workspace" })).toBeDisabled();
+    } else {
+      expect(screen.getByRole("link", { name: "Continue with Microsoft" })).toHaveAttribute("href", "/.auth/login/aad?post_login_redirect_uri=/");
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    }
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it("shows the unavailable backend and retries without claiming a working account", async () => {
     const fetcher = vi.fn<typeof fetch>().mockRejectedValue(new TypeError("unavailable"));
     vi.stubGlobal("fetch", fetcher);

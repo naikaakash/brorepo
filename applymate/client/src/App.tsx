@@ -12,7 +12,7 @@ import { Badge, Brand, Button, Notice } from "./ui";
 import { useAction } from "./hooks";
 import type { PageProps } from "./ui";
 
-const sessionSchema = z.object({ user: z.object({ id: z.string(), email: z.email(), name: z.string() }).nullable() });
+const sessionSchema = z.object({ user: z.object({ id: z.string(), email: z.email(), name: z.string() }).nullable(), authenticated: z.boolean().optional() });
 const navigation = [
   { id: "overview", label: "Overview", icon: House, group: "YOUR WORKSPACE" },
   { id: "jobs", label: "Opportunities", icon: Search },
@@ -29,6 +29,7 @@ const currentPath = () => window.location.hash.slice(1) || "overview";
 export default function App() {
   const [data, setData] = useState<Workspace | null>(null);
   const [capabilities, setCapabilities] = useState<z.infer<typeof capabilitySchema> | null>(null);
+  const [microsoftAuthenticated, setMicrosoftAuthenticated] = useState(false);
   const [booting, setBooting] = useState(true);
   const [error, setError] = useState("");
   const [boot, setBoot] = useState(0);
@@ -51,13 +52,14 @@ export default function App() {
     if (import.meta.env.VITE_PUBLIC_PREVIEW === "true") return;
     let active = true;
     api.onUnauthorized = () => {
-      api.reset(); setData(null); setError("Your session expired. Verify a new code to continue.");
+      api.reset(); setData(null); setMicrosoftAuthenticated(false); setError("Your session expired. Sign in again to continue.");
     };
     async function start() {
       try {
         const [config, session] = await Promise.all([api.request("/capabilities", capabilitySchema), api.request("/session", sessionSchema)]);
         if (!active) return;
         setCapabilities(config);
+        setMicrosoftAuthenticated(session.authenticated === true);
         if (session.user) await refresh();
       } catch (failure) { if (active && !cancelled(failure)) setError(failure instanceof Error ? failure.message : "The local server is unavailable."); }
       finally { if (active) setBooting(false); }
@@ -90,9 +92,9 @@ export default function App() {
     api.reset(); setData(null); setError(""); setMenu(false); navigate("welcome");
   }
   if (import.meta.env.VITE_PUBLIC_PREVIEW === "true") return <Auth publicPreview mailMode="local" signedIn={async () => { throw new Error("Authentication is unavailable in the public frontend preview."); }} />;
-  if (booting) return <div className="boot-screen"><Brand /><p role="status">Opening your local workspace...</p></div>;
+  if (booting) return <div className="boot-screen"><Brand /><p role="status">Opening ApplyMate...</p></div>;
   if (!capabilities) return <div className="boot-screen"><Brand /><Notice tone="error">{error || "The local API is unavailable."}</Notice><Button className="primary" onClick={() => { setBooting(true); setError(""); setBoot((value) => value + 1); }}>Try again</Button></div>;
-  if (!data) return <>{error && <div className="landing-alert"><Notice tone="warning">{error}</Notice></div>}<Auth mailMode={capabilities.mailMode} signedIn={async () => { setError(""); await refresh(); navigate("overview"); }} /></>;
+  if (!data) return <>{error && <div className="landing-alert"><Notice tone="warning">{error}</Notice></div>}<Auth mailMode={capabilities.mailMode} microsoftAuthenticated={microsoftAuthenticated} signedIn={async () => { setError(""); await refresh(); navigate("overview"); }} /></>;
   const [section, id] = path.split("/");
   const props: PageProps = { data, refresh, navigate };
   let page;
@@ -112,7 +114,7 @@ export default function App() {
     <aside className={`sidebar ${menu ? "is-open" : ""}`} aria-label="Workspace navigation">
       <a className="sidebar-brand" href="#overview" aria-label="ApplyMate overview"><Brand /></a>
       <nav>{navigation.map(({ id: item, label, icon: Icon, group }) => <div key={item}>{group && <p className="nav-group">{group}</p>}<a href={`#${item}`} className={`nav-link ${section === item || (item === "overview" && !navigation.some((entry) => entry.id === section)) ? "active" : ""}`} aria-current={section === item ? "page" : undefined}><Icon size={19} aria-hidden="true" />{label}{item === "applications" && data.applications.length > 0 && <span className="nav-count">{data.applications.length}</span>}</a></div>)}</nav>
-      <div className="sidebar-bottom"><div className="local-status"><ShieldCheck size={20} aria-hidden="true" /><div><strong>{data.capabilities.localOnly ? "Local & in your control" : "Private Azure pilot"}</strong><p>{data.capabilities.localOnly ? "No cloud deployment" : "Microsoft sign-in · Owner only"}</p></div></div>
+      <div className="sidebar-bottom"><div className="local-status"><ShieldCheck size={20} aria-hidden="true" /><div><strong>{data.capabilities.localOnly ? "Local & in your control" : "Your private workspace"}</strong><p>{data.capabilities.localOnly ? "No cloud deployment" : "Microsoft sign-in · Public test"}</p></div></div>
         <div className="account-row"><span className="avatar">{(data.profile.fields.fullName.value || data.user.email).slice(0, 1).toUpperCase()}</span><div><strong>{data.profile.fields.fullName.value || "Your workspace"}</strong><span title={data.user.email}>{data.user.email}</span></div></div>
         <Button className="text-button signout" loading={account.busy} onClick={() => { void account.run(signOut); }}><LogOut size={16} aria-hidden="true" /> Sign out</Button>
       </div>

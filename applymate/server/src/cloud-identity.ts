@@ -3,7 +3,7 @@ import { z } from "@applymate/contracts";
 import { digest } from "./crypto.js";
 import { requireCondition } from "./errors.js";
 
-export interface CloudConfig { tenant: string; objectId: string }
+export interface CloudConfig { tenant: string; objectId: string; publicSignup?: boolean }
 export interface CloudIdentity { id: string; email: string; name: string; sessionCreatedAt: Date }
 const principalSchema = z.object({
   auth_typ: z.literal("aad"),
@@ -22,10 +22,14 @@ export function cloudIdentity(req: Request, config: CloudConfig): CloudIdentity 
   const claim = (...names: string[]) => parsed.data.claims.find((entry) => names.includes(entry.typ))?.val;
   const tenant = claim("tid", "http://schemas.microsoft.com/identity/claims/tenantid");
   const objectId = claim("oid", "http://schemas.microsoft.com/identity/claims/objectidentifier");
-  requireCondition(tenant === config.tenant && objectId === config.objectId, 403, "PILOT_ACCESS", "This personal pilot is restricted to its owner.");
+  requireCondition(config.publicSignup ? z.uuid().safeParse(tenant).success && z.uuid().safeParse(objectId).success :
+    tenant === config.tenant && objectId === config.objectId,
+    403, "PILOT_ACCESS", config.publicSignup ? "Microsoft must provide a valid tenant and user identity." : "This personal pilot is restricted to its owner.");
   const email = claim("email", "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress", "preferred_username", "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name");
   requireCondition(z.email().safeParse(email).success, 403, "IDENTITY_EMAIL", "Your Microsoft identity must provide a valid email address.");
-  const issued = Number(claim("auth_time", "iat"));
+  const authenticatedAt = claim("auth_time") ?? claim("http://schemas.microsoft.com/ws/2008/06/identity/claims/authenticationinstant");
+  const issued = authenticatedAt === undefined ? Number(claim("iat")) :
+    /^\d+$/.test(authenticatedAt) ? Number(authenticatedAt) : Date.parse(authenticatedAt) / 1000;
   const age = Date.now() / 1000 - issued;
   requireCondition(Number.isFinite(issued) && issued > 0 && age >= -60 && age <= 86400,
     401, "REAUTHENTICATE", "Sign out and sign in with Microsoft again to renew this pilot session.");

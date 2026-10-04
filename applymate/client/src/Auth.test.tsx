@@ -17,6 +17,28 @@ async function requestCode() {
 const letter = () => Response.json({ code: "123456", expiresAt: "2026-10-03T01:00:00Z", notice: "No email delivered." });
 
 describe("passwordless sign-in interface", () => {
+  it("shows the public landing with opt-in Microsoft login and no private-data form", () => {
+    const fetcher = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetcher);
+    render(<Auth mailMode="microsoft" signedIn={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: "Meet your next chapter." })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Continue with Microsoft" })).toHaveAttribute("href", "/.auth/login/aad?post_login_redirect_uri=/");
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("shows cloud consent only after Microsoft authentication", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ saved: true }));
+    vi.stubGlobal("fetch", fetcher);
+    const signedIn = vi.fn(async () => undefined);
+    render(<Auth mailMode="microsoft" microsoftAuthenticated signedIn={signedIn} />);
+    expect(screen.queryByRole("link", { name: "Continue with Microsoft" })).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Open my online workspace" }));
+    await waitFor(() => expect(signedIn).toHaveBeenCalledOnce());
+  });
   it("requires consent and signs in using the real transport contract without browser persistence", async () => {
     const signedIn = vi.fn(async () => undefined);
     const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({ success: true })).mockResolvedValueOnce(letter())

@@ -102,9 +102,10 @@ export async function createApp(config: AppConfig) {
   });
   app.get("/api/session", async (req, res) => {
     if (config.cloud) {
+      if (!req.get("x-ms-client-principal")) return void res.json({ user: null, authenticated: false });
       const user = cloudIdentity(req, config.cloud);
       const result = await database.query<{ id: string }>('SELECT id FROM "user" WHERE id=$1 AND "termsVersion"=$2', [user.id, policyVersion]);
-      return void res.json({ user: result.rows.length ? { id: user.id, email: user.email, name: user.name } : null });
+      return void res.json({ user: result.rows.length ? { id: user.id, email: user.email, name: user.name } : null, authenticated: true });
     }
     const session = await identity.auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
     res.json({ user: session ? { id: session.user.id, email: session.user.email, name: session.user.name } : null });
@@ -113,11 +114,15 @@ export async function createApp(config: AppConfig) {
     requireCondition(config.cloud, 404, "NOT_AVAILABLE", "Microsoft pilot onboarding is not enabled.");
     z.object({ consent: z.literal(true), policyVersion: z.literal(policyVersion) }).strict().parse(req.body);
     const user = cloudIdentity(req, config.cloud);
-    await database.query(
+    const emailOwner = await database.query<{ id: string }>('SELECT id FROM "user" WHERE email=$1 AND id<>$2', [user.email, user.id]);
+    requireCondition(!emailOwner.rows.length, 409, "ACCOUNT_IDENTITY", "This email already belongs to another Microsoft identity. Sign in with the original account; identities are not linked automatically.");
+    const created = await database.query<{ id: string }>(
       `INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt","termsVersion")
-       VALUES ($1,$2,$3,true,now(),now(),$4)
-       ON CONFLICT (id) DO UPDATE SET name=$2,email=$3,"updatedAt"=now(),"termsVersion"=$4`,
+       SELECT $1,$2,$3,true,now(),now(),$4
+       WHERE EXISTS (SELECT 1 FROM "user" WHERE id=$1) OR (SELECT count(*) FROM "user") < 100
+       ON CONFLICT (id) DO UPDATE SET name=$2,email=$3,"updatedAt"=now(),"termsVersion"=$4 RETURNING id`,
       [user.id, user.name, user.email, policyVersion]);
+    requireCondition(created.rows.length, 429, "PILOT_FULL", "This small test website has reached its 100-account limit. New signups are paused.");
     res.json({ saved: true });
   });
   const signedIn: RequestHandler = async (req, res, next) => {

@@ -54,7 +54,7 @@ async function main() {
       directory: join(dataRoot, "postgres"), cipher, origin, origins: cloud ? [origin] : origins,
       smtpUrl: cloud ? undefined : process.env.APPLYMATE_SMTP_URL, smtpFrom: cloud ? undefined : process.env.APPLYMATE_SMTP_FROM,
       ...(cloud ? {
-        cloud: { tenant: process.env.APPLYMATE_TENANT!, objectId: process.env.APPLYMATE_OWNER! },
+        cloud: { tenant: process.env.APPLYMATE_TENANT!, objectId: process.env.APPLYMATE_OWNER!, publicSignup: process.env.APPLYMATE_PUBLIC_SIGNUP === "true" },
         frontend: join(root, "applymate", "client", "dist")
       } : {})
     });

@@ -21,7 +21,7 @@ npm run preview:applymate
 
 Open `http://localhost:4174`, use a test email, request a code, and select **Open local email preview**. Start with synthetic resume data.
 
-The owner-restricted Azure pilot is hosted at [ApplyMate Microsoft sign-in](https://applymate-personal.purplesand-17d722b5.eastus.azurecontainerapps.io/.auth/login/aad?post_login_redirect_uri=/). It serves the frontend and backend together with private persistent storage. Microsoft sign-in is restricted to the pilot owner; Google sign-in is not implemented.
+The public Azure test is hosted at [ApplyMate](https://applymate-personal.purplesand-17d722b5.eastus.azurecontainerapps.io/). Browse the landing page without signing in, then choose Microsoft sign-in to create an account-isolated workspace with persistent storage. Personal and work/school Microsoft accounts are supported, subject to organization policies. Use synthetic data; signup is capped at 100 accounts. Google and other OAuth providers still require separate registrations and are not configured.
 
 See [ApplyMate setup, workflow, limitations, and hosting instructions](applymate/README.md). **The BroCalc Azure template and deployment workflow below remain separate.**
 

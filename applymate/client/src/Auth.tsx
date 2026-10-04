@@ -8,7 +8,7 @@ import { useAction } from "./hooks";
 const letterSchema = z.object({ code: z.string().regex(/^\d{6}$/), expiresAt: z.string(), notice: z.string() });
 const signInSchema = z.object({ user: z.object({ id: z.string(), email: z.email() }), token: z.string() });
 
-export function Auth({ mailMode, signedIn, publicPreview = false }: { mailMode: "local" | "smtp" | "microsoft"; signedIn: () => Promise<void>; publicPreview?: boolean }) {
+export function Auth({ mailMode, signedIn, publicPreview = false, microsoftAuthenticated = false }: { mailMode: "local" | "smtp" | "microsoft"; signedIn: () => Promise<void>; publicPreview?: boolean; microsoftAuthenticated?: boolean }) {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [consent, setConsent] = useState(false);
@@ -24,7 +24,7 @@ export function Auth({ mailMode, signedIn, publicPreview = false }: { mailMode: 
     previouslySent.current = sent;
   }, [sent]);
   return <div className="landing">
-    <header className="landing-nav"><a href="#welcome" aria-label="ApplyMate home"><Brand /></a><Badge><span className="status-dot" /> {publicPreview ? "Public frontend preview" : mailMode === "microsoft" ? "Private online pilot" : "Local preview"}</Badge></header>
+    <header className="landing-nav"><a href="#welcome" aria-label="ApplyMate home"><Brand /></a><Badge><span className="status-dot" /> {publicPreview ? "Public frontend preview" : mailMode === "microsoft" ? "Public test website" : "Local preview"}</Badge></header>
     <main className="landing-main">
       <section className="landing-story">
         <p className="eyebrow"><Sparkles size={16} aria-hidden="true" /> YOUR NEXT CHAPTER STARTS WITH YOU</p>
@@ -49,8 +49,13 @@ export function Auth({ mailMode, signedIn, publicPreview = false }: { mailMode: 
           <p>The integrated local workflow includes confirmed candidate facts, writing-voice onboarding, job evidence mapping, reviewed PDF and Word exports, and manual application tracking.</p>
           <a className="button primary full" href="https://github.com/naikaakash/brorepo/tree/main">View source &amp; local setup <ArrowRight size={18} aria-hidden="true" /></a>
           <p>No account or personal information is collected by this preview. Public account features require a production backend and delivered-email verification.</p>
+        </div> : mailMode === "microsoft" && !microsoftAuthenticated ? <div>
+          <a className="button primary full" href="/.auth/login/aad?post_login_redirect_uri=/">Continue with Microsoft <ArrowRight size={18} aria-hidden="true" /></a>
+          <p>Personal Microsoft accounts and work or school accounts can sign in. Each account gets its own private workspace.</p>
+          <Notice>This is a small public test, not a production service. Please use synthetic resumes. No employer submissions or model calls happen automatically.</Notice>
+          <p>Google and other sign-in providers are not configured yet. No account is needed to browse this landing page.</p>
         </div> : mailMode === "microsoft" ? <div>
-          <Notice>Your Microsoft account is authenticated by Azure. This pilot is restricted to its owner. Profile data and files are saved in private Azure storage, not on this computer.</Notice>
+          <Notice>Your Microsoft account is authenticated by Azure. Your profile and files are saved in your private workspace in Azure storage, not on this computer.</Notice>
           <label className="check-row"><input type="checkbox" checked={consent} disabled={action.busy} onChange={(event) => setConsent(event.target.checked)} /><span>I consent to storing my profile and files in this private online pilot until I delete them. No model calls or employer submissions happen without my explicit action.</span></label>
           {action.feedback}
           <Button className="primary full" disabled={!consent} loading={action.busy} onClick={() => {
@@ -105,6 +110,6 @@ export function Auth({ mailMode, signedIn, publicPreview = false }: { mailMode: 
         <div className="auth-footer"><LockKeyhole size={15} aria-hidden="true" /><span>Passwordless. Private to this local workspace.<br />No third-party AI calls unless you configure and choose a provider.</span></div></>}
       </section>
     </main>
-    <footer className="landing-footer"><span>Built around your story, not a template.</span><span>Personal learning preview &middot; {publicPreview ? "Frontend only" : "Not a public service"}</span></footer>
+    <footer className="landing-footer"><span>Built around your story, not a template.</span><span>Personal learning preview &middot; {publicPreview ? "Frontend only" : mailMode === "microsoft" ? "Public test · Use synthetic data" : "Not a public service"}</span></footer>
   </div>;
 }
