@@ -11,6 +11,20 @@ afterEach(() => {
 });
 
 describe("live workspace rather than a mock dashboard", () => {
+  it.each([401, 403])("keeps the public landing and logout recovery available when Microsoft identity fails (%s)", async (status) => {
+    const data = workspaceFixture();
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockImplementation(async (path) => {
+      if (String(path).endsWith("/capabilities")) return Response.json({ ...data.capabilities, localOnly: false, mailMode: "microsoft" });
+      if (String(path).endsWith("/session")) return Response.json({ error: { code: "PILOT_ACCESS", message: "Microsoft must provide a valid tenant and user identity." } }, { status });
+      throw new Error(`Unexpected private request: ${String(path)}`);
+    }));
+    render(<App />);
+    await screen.findByRole("heading", { name: "Meet your next chapter." });
+    expect(screen.getByRole("link", { name: "Sign out and return to landing" })).toHaveAttribute("href", "/.auth/logout?post_logout_redirect_uri=/");
+    expect(screen.getByRole("link", { name: "Continue with Microsoft" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+  });
+
   it.each([false, true])("boots cloud authentication without requesting private data before consent (authenticated=%s)", async (authenticated) => {
     const data = workspaceFixture();
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (path) => {

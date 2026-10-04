@@ -64,7 +64,7 @@ describe("Azure owner-restricted pilot", () => {
   it("allows public signup while isolating identities, private records and deletion", async () => {
     const tenant = "11111111-1111-4111-8111-111111111111";
     const first = "22222222-2222-4222-8222-222222222222";
-    const second = "33333333-3333-4333-8333-333333333333";
+    const second = "00000000-0000-0000-1234-123456789abc";
     const runtime = await createApp({ cipher: new Cipher(randomBytes(32)), origin, origins: [origin], cloud: { tenant, objectId: first, publicSignup: true } });
     const headers = (oid: string, email: string, tid = tenant) => ({
       Host: new URL(origin).host, Origin: origin, "X-Applymate-Request": "1",
@@ -82,7 +82,7 @@ describe("Azure owner-restricted pilot", () => {
       expect((await api.delete("/api/account").set(anonymous).send({ confirmation: "DELETE" })).status).toBe(401);
       expect((await api.post("/api/cloud-account").set(anonymous).send({ consent: true, policyVersion })).status).toBe(401);
       const owner = headers(first, "first@example.test");
-      const other = headers(second, "second@example.test", "44444444-4444-4444-8444-444444444444");
+      const other = headers(second, "second@example.test", "9188040d-6c67-4c5b-b112-36a304b66dad");
       for (const user of [owner, other]) {
         expect((await api.post("/api/cloud-account").set(user).send({ consent: true, policyVersion })).status).toBe(200);
       }
@@ -99,6 +99,9 @@ describe("Azure owner-restricted pilot", () => {
       expect((await api.get("/api/workspace").set(other)).status).toBe(401);
       const invalid = headers("", "invalid@example.test");
       expect((await api.get("/api/session").set(invalid)).status).toBe(403);
+      for (const oid of ["00000000-0000-0000-0000-000000000000", "not-a-guid"]) {
+        expect((await api.get("/api/session").set(headers(oid, "invalid@example.test"))).status).toBe(403);
+      }
       await runtime.store.database.query(
         `INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt","termsVersion")
          SELECT 'capacity-'||n, 'Test', 'capacity-'||n||'@example.test', true, now(), now(), $1 FROM generate_series(1,99) AS n`, [policyVersion]);

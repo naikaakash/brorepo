@@ -141,6 +141,8 @@ The local build remains fully interactive. Public sign-in and saved-data feature
 
 Public signup is explicitly enabled with `publicSignup=true` in the runtime template and a Microsoft registration supporting personal and organizational accounts. Without that flag, private access remains owner-restricted. Cloud signup is limited to 100 stored accounts. Different Microsoft identities remain separate even when an email matches; email collisions are rejected rather than automatically linking accounts.
 
+If Microsoft sign-in is rejected, the public landing remains visible with **Sign out and return to landing**. This clears the Azure session rather than retrying the same rejected identity indefinitely. **Sign out / use another account** is also available beside the landing sign-in controls.
+
 Account deletion and provider-key actions require authentication within five minutes. In Settings, click the prominent **Verify Microsoft sign-in to delete** button to clear the platform session and complete a fresh Microsoft login. Back in Settings, type `DELETE` and submit within five minutes. Unsaved form changes are lost on navigation. Reauthentication never deletes data automatically, and an expired sign-in leaves the workspace intact.
 
 The pilot uses Container Apps Consumption with 0.5 CPU/1 GiB and one replica, a Basic container registry, private Azure Files, a managed-identity Blob lease, and Key Vault secret references. Domain payloads and documents retain application encryption; authentication metadata is not payload-encrypted. The cloud key and database are separate from local data. The deployment package excludes local databases, keys, resumes, tests, and private documents.

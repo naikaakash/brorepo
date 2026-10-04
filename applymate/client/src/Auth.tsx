@@ -51,6 +51,7 @@ export function Auth({ mailMode, signedIn, publicPreview = false, microsoftAuthe
           <p>No account or personal information is collected by this preview. Public account features require a production backend and delivered-email verification.</p>
         </div> : mailMode === "microsoft" && !microsoftAuthenticated ? <div>
           <a className="button primary full" href="/.auth/login/aad?post_login_redirect_uri=/">Continue with Microsoft <ArrowRight size={18} aria-hidden="true" /></a>
+          <p><a className="button secondary full" href="/.auth/logout?post_logout_redirect_uri=/">Sign out / use another account</a></p>
           <p>Personal Microsoft accounts and work or school accounts can sign in. Each account gets its own private workspace.</p>
           <Notice>This is a small public test, not a production service. Please use synthetic resumes. No employer submissions or model calls happen automatically.</Notice>
           <p>Google and other sign-in providers are not configured yet. No account is needed to browse this landing page.</p>

@@ -9,6 +9,7 @@ const principalSchema = z.object({
   auth_typ: z.literal("aad"),
   claims: z.array(z.object({ typ: z.string(), val: z.string() })).max(200)
 });
+const microsoftIdSchema = z.guid().refine((value) => value !== "00000000-0000-0000-0000-000000000000");
 
 // Only enable behind App Service Easy Auth, which strips external principal headers.
 export function cloudIdentity(req: Request, config: CloudConfig): CloudIdentity {
@@ -22,7 +23,7 @@ export function cloudIdentity(req: Request, config: CloudConfig): CloudIdentity 
   const claim = (...names: string[]) => parsed.data.claims.find((entry) => names.includes(entry.typ))?.val;
   const tenant = claim("tid", "http://schemas.microsoft.com/identity/claims/tenantid");
   const objectId = claim("oid", "http://schemas.microsoft.com/identity/claims/objectidentifier");
-  requireCondition(config.publicSignup ? z.uuid().safeParse(tenant).success && z.uuid().safeParse(objectId).success :
+  requireCondition(config.publicSignup ? microsoftIdSchema.safeParse(tenant).success && microsoftIdSchema.safeParse(objectId).success :
     tenant === config.tenant && objectId === config.objectId,
     403, "PILOT_ACCESS", config.publicSignup ? "Microsoft must provide a valid tenant and user identity." : "This personal pilot is restricted to its owner.");
   const email = claim("email", "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress", "preferred_username", "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name");
